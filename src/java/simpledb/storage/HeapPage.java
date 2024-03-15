@@ -72,8 +72,11 @@ public class HeapPage implements Page {
         @return the number of tuples on this page
     */
     private int getNumTuples() {        
-        // some code goes here
-        return 0;
+       int num = 0;
+        for (byte b : header) {
+            if (b == 1) num++;
+        }
+        return num;
 
     }
 
@@ -83,8 +86,13 @@ public class HeapPage implements Page {
      */
     private int getHeaderSize() {        
         
-        // some code goes here
-        return 0;
+       int numHeaderBytes= 0;
+        int numSlots = BufferPool.getPageSize() / 8;
+        while (numSlots > 0) {
+            numSlots /= 8;
+            numHeaderBytes++;
+        }
+        return numHeaderBytes;
                  
     }
     
@@ -117,8 +125,9 @@ public class HeapPage implements Page {
      * @return the PageId associated with this page.
      */
     public HeapPageId getId() {
-    // some code goes here
+    
     throw new UnsupportedOperationException("implement this");
+    return pid;
     }
 
     /**
@@ -249,8 +258,15 @@ public class HeapPage implements Page {
      * @param t The tuple to delete
      */
     public void deleteTuple(Tuple t) throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        RecordId rid = t.getRecordId();
+        int slotId = rid.getPageId().getPageNumber();
+        if (!rid.getPageId().equals(pid)) {
+            throw new DbException("Tuple not on this page.");
+        }
+        if (!isSlotUsed(slotId)) {
+            throw new DbException("Tuple slot already empty.");
+        }
+        header[slotId] = 0;
     }
 
     /**
@@ -261,8 +277,18 @@ public class HeapPage implements Page {
      * @param t The tuple to add.
      */
     public void insertTuple(Tuple t) throws DbException {
-        // some code goes here
-        // not necessary for lab1
+       if (!td.equals(t.getTupleDesc())) {
+            throw new DbException("TupleDesc mismatch.");
+        }
+        for (int i=0; i<tuples.length; i++) {
+            if (!isSlotUsed(i)) {
+                tuples[i] = t;
+                header[i] = 1;
+                t.setRecordId(new RecordId(pid, i));
+                return;
+            }
+        }
+        throw new DbException("Page is full.");
     }
 
     /**
@@ -270,16 +296,15 @@ public class HeapPage implements Page {
      * that did the dirtying
      */
     public void markDirty(boolean dirty, TransactionId tid) {
-        // some code goes here
-	// not necessary for lab1
+        
+	
     }
 
     /**
      * Returns the tid of the transaction that last dirtied this page, or null if the page is not dirty
      */
     public TransactionId isDirty() {
-        // some code goes here
-	// Not necessary for lab1
+      
         return null;      
     }
 
@@ -287,24 +312,35 @@ public class HeapPage implements Page {
      * Returns the number of empty slots on this page.
      */
     public int getNumEmptySlots() {
-        // some code goes here
-        return 0;
+        int numEmpty = 0;
+        for (byte b : header) {
+            if (b == 0) numEmpty++;
+        }
+        return numEmpty;
     }
 
     /**
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-        // some code goes here
-        return false;
+        if (i < 0 || i >= numSlots) {
+            throw new IllegalArgumentException("Invalid slot index.");
+        }
+        return header[i] == 1;
     }
 
     /**
      * Abstraction to fill or clear a slot on this page.
      */
     private void markSlotUsed(int i, boolean value) {
-        // some code goes here
-        // not necessary for lab1
+       if (i < 0 || i >= numSlots) {
+            throw new IllegalArgumentException("Invalid slot index.");
+        }
+        if (value) {
+            header[i] = 1;
+        } else {
+            header[i] = 0;
+        }
     }
 
     /**
@@ -312,8 +348,13 @@ public class HeapPage implements Page {
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
-        // some code goes here
-        return null;
+        List<Tuple> tupleList = new ArrayList<>();
+        for (int i=0; i<tuples.length; i++) {
+            if (isSlotUsed(i)) {
+                tupleList.add(tuples[i]);
+            }
+        }
+        return tupleList.iterator();
     }
 
 }

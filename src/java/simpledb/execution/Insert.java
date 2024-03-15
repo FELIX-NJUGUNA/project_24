@@ -29,26 +29,48 @@ public class Insert extends Operator {
      *             if TupleDesc of child differs from table into which we are to
      *             insert.
      */
-    public Insert(TransactionId t, OpIterator child, int tableId)
-            throws DbException {
-        // some code goes here
+        private final TransactionId t;
+    private final OpIterator child;
+    private final int tableId;
+    private final TupleDesc tupleDesc;
+    private final BufferPool bufferPool;
+    private boolean opened;
+
+
+    public Insert(TransactionId t, OpIterator child, int tableId)throws DbException {
+        this.t = t;
+        this.child = child;
+        this.tableId = tableId;
+        this.tupleDesc = child.getTupleDesc();
+        this.bufferPool = Database.getBufferPool();
+        this.opened = false;
     }
 
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return TupleDesc.getTupleDesc(new Type[]{Type.INT_TYPE});
     }
 
+   @Override
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        if (opened) {
+            throw new IllegalStateException("Insert operator is already open.");
+        }
+        child.open();
+        opened = true;
     }
 
+   
+    @Override
     public void close() {
-        // some code goes here
+        child.close();
+        opened = false;
     }
 
+    
+    @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        child.rewind();
     }
 
     /**
@@ -64,19 +86,42 @@ public class Insert extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#insertTuple
      */
+    @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        if (!opened) {
+            throw new IllegalStateException("Insert operator is not open.");
+        }
+
+        int count = 0;
+        while (child.hasNext()) {
+            Tuple next = child.next();
+            try {
+                bufferPool.insertTuple(t, tableId, next);
+                count++;
+            } catch (BufferPool.PageNotReadException | BufferPool.InvalidPageException | BufferPool.PageUnpinnedException e) {
+                throw new DbException("Failed to insert tuple.", e);
+            }
+        }
+
+        if (count > 0) {
+            return new Tuple(getTupleDesc());
+        } else {
+            return null;
+        }
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        return new OpIterator[]{child};
+
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        if (children.length != 1) {
+            throw new IllegalArgumentException("Insert operator expects exactly one child.");
+        }
+        child = children[0];;
     }
+
 }

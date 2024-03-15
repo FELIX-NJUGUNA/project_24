@@ -57,58 +57,68 @@ public class Predicate implements Serializable {
      * @param operand
      *            field value to compare passed in tuples to
      */
+
+   // The field number of the tuple to compare against
+    private int field;
+
+    // The operator to use for comparison
+    private Op op;
+
+    // The operand to compare the tuple field to
+    private Field operand;
+
+    // Constructor for Predicate
     public Predicate(int field, Op op, Field operand) {
-        // some code goes here
+        this.field = field;
+        this.op = op;
+        this.operand = operand;
     }
 
-    /**
-     * @return the field number
-     */
-    public int getField()
-    {
-        // some code goes here
-        return -1;
+    // Method to get the field number
+    public int getField() {
+        return field;
     }
 
-    /**
-     * @return the operator
-     */
-    public Op getOp()
-    {
-        // some code goes here
-        return null;
+    // Method to get the operator
+    public Op getOp() {
+        return op;
     }
-    
-    /**
-     * @return the operand
-     */
-    public Field getOperand()
-    {
-        // some code goes here
-        return null;
+
+    // Method to get the operand
+    public Field getOperand() {
+        return operand;
     }
-    
-    /**
-     * Compares the field number of t specified in the constructor to the
-     * operand field specified in the constructor using the operator specific in
-     * the constructor. The comparison can be made through Field's compare
-     * method.
-     * 
-     * @param t
-     *            The tuple to compare against
-     * @return true if the comparison is true, false otherwise.
-     */
+
+    // Method to filter a tuple based on the predicate
     public boolean filter(Tuple t) {
-        // some code goes here
-        return false;
+        Field fieldValue = t.getField(this.field);
+        int comparisonResult = fieldValue.compare(op, operand);
+
+        switch (op) {
+            case EQUALS:
+                return comparisonResult== 0;
+            case GREATER_THAN:
+                return comparisonResult > 0;
+            case LESS_THAN:
+                return comparisonResult < 0;
+            case LESS_THAN_OR_EQ:
+                return comparisonResult <= 0;
+            case GREATER_THAN_OR_EQ:
+                return comparisonResult >= 0;
+            case LIKE:
+                // Implementation of LIKE operator is not provided
+                throw new UnsupportedOperationException("LIKE operator is not supported");
+            case NOT_EQUALS:
+                return comparisonResult != 0;
+            default:
+                throw new IllegalStateException("impossible to reach here");
+        }
     }
 
-    /**
-     * Returns something useful, like "f = field_id op = op_string operand =
-     * operand_string"
-     */
+    
+   
+    // Method to get a string representation of the predicate
     public String toString() {
-        // some code goes here
-        return "";
+        return "f = " + field + " op = " + op.toString() + " operand = " + operand.toString();
     }
 }

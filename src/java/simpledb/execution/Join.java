@@ -1,10 +1,7 @@
-package simpledb.execution;
-
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.common.DbException;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
-
 import java.util.*;
 
 /**
@@ -14,10 +11,22 @@ public class Join extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    // The predicate to use to join the children
+    private JoinPredicate joinPredicate;
+
+    // Iterator for the left(outer) relation to join
+    private OpIterator child1;
+
+    // Iterator for the right(inner) relation to join
+    private OpIterator child2;
+
+    // The tuple descriptor of the joined tuples
+    private TupleDesc tupleDesc;
+
     /**
      * Constructor. Accepts two children to join and the predicate to join them
      * on
-     * 
+     *
      * @param p
      *            The predicate to use to join the children
      * @param child1
@@ -26,32 +35,31 @@ public class Join extends Operator {
      *            Iterator for the right(inner) relation to join
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
-        // some code goes here
+        this.joinPredicate = p;
+        this.child1 = child1;
+        this.child2 = child2;
+        this.tupleDesc = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
+    /**
+     * @return The predicate used to join the children
+     */
     public JoinPredicate getJoinPredicate() {
-        // some code goes here
-        return null;
+        return joinPredicate;
     }
 
     /**
-     * @return
-     *       the field name of join field1. Should be quantified by
-     *       alias or table name.
-     * */
+     * @return The field name of join field1
+     */
     public String getJoinField1Name() {
-        // some code goes here
-        return null;
+        return child1.getTupleDesc().getFieldName(joinPredicate.getField1());
     }
 
     /**
-     * @return
-     *       the field name of join field2. Should be quantified by
-     *       alias or table name.
-     * */
+     * @return The field name of join field2
+     */
     public String getJoinField2Name() {
-        // some code goes here
-        return null;
+        return child2.getTupleDesc().getFieldName(joinPredicate.getField2());
     }
 
     /**
@@ -59,21 +67,24 @@ public class Join extends Operator {
      *      implementation logic.
      */
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return tupleDesc;
     }
 
-    public void open() throws DbException, NoSuchElementException,
-            TransactionAbortedException {
-        // some code goes here
+    public void open() throws DbException, NoSuchElementException, TransactionAbortedException {
+        child1.open();
+        child2.open();
+        super.open();
     }
 
     public void close() {
-        // some code goes here
+        child1.close();
+        child2.close();
+        super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        child1.rewind();
+        child2.rewind();
     }
 
     /**
@@ -95,19 +106,46 @@ public class Join extends Operator {
      * @see JoinPredicate#filter
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        Tuple t1 = null;
+        Tuple t2 = null;
+
+        while (t1 == null || t2 == null) {
+            if (t1 == null) {
+                t1 = child1.next();
+            }
+            if (t2 == null) {
+                while (t1 != null && !joinPredicate.filter(t1, t2)) {
+                    t2 = child2.next();
+                    if (t2 == null) {
+                        t1 = child1.next();
+                    }
+                }
+            }
+        }
+
+        Tuple joinedTuple = new Tuple(tupleDesc);
+        int i = 0;
+        for (; i < child1.getTupleDesc().numFields(); i++) {
+            joinedTuple.setField(i, t1.getField(i));
+        }
+        for (int j = 0; i < tupleDesc.numFields(); i++, j++) {
+            joinedTuple.setField(i, t2.getField(j));
+        }
+
+        return joinedTuple;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        return new OpIterator[]{child1, child2};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        if (children.length != 2) {
+            throw new IllegalArgumentException("Join expects 2 children");
+        }
+        this.child1 = children[0];
+        this.child2 = children[1];
     }
-
 }
